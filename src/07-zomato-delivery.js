@@ -85,25 +85,61 @@
  *   //      { status: "fulfilled", value: { error: "Invalid order details!", status: "failed" } } ]
  */
 export function placeOrder(restaurant, items) {
-  // Your code here
+  return new Promise((res, rej) => {
+    if (restaurant.trim() === "" || !Array.isArray(items) || items.length === 0)
+      return rej(new Error("Invalid order details!"));
+    setTimeout(() => {
+      res({
+        orderId: Math.floor(Math.random() * 10000),
+        restaurant,
+        items,
+        status: "placed",
+        timestamp: new Date().toISOString(),
+      });
+    }, 50);
+  });
 }
 
 export function confirmOrder(order) {
-  // Your code here
+  return new Promise((res, rej) => {
+    if (!order.orderId || order.status !== "placed")
+      return rej(new Error("Order cannot be confirmed!"));
+    res({ ...order, status: "confirmed", estimatedTime: 30 });
+  });
 }
 
 export function assignRider(order) {
-  // Your code here
+  return new Promise((res, rej) => {
+    if (order.status !== "confirmed")
+      return rej(new Error("Order not confirmed yet!"));
+    const selectedRider = "Amit";
+    res({ ...order, rider: selectedRider, status: "assigned" });
+  });
 }
 
 export function deliverOrder(order) {
-  // Your code here
+  return new Promise((res, rej) => {
+    if (!order.rider || order.status !== "assigned")
+      return rej(new Error("No rider assigned!"));
+    res({
+      ...order,
+      status: "delivered",
+      deliveredAt: new Date().toISOString(),
+    });
+  });
 }
 
 export function processDelivery(restaurant, items) {
-  // Your code here
+  return placeOrder(restaurant, items)
+    .then((order) => confirmOrder(order))
+    .then((order) => assignRider(order))
+    .then((order) => deliverOrder(order))
+    .catch((error) => ({ error: error.message, status: "failed" }));
 }
 
 export function processMultipleOrders(orderList) {
-  // Your code here
+  const multipleOrders = orderList.map((order) =>
+    processDelivery(order.restaurant, order.items),
+  );
+  return Promise.allSettled(multipleOrders);
 }

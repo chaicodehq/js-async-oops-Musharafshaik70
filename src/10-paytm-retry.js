@@ -114,40 +114,125 @@
  */
 export class PaymentError extends Error {
   constructor(message, code, amount) {
-    // Your code here
+    super(message);
+    this.name = "PaymentError";
+    this.code = code;
+    this.amount = amount;
   }
 }
 
 export class InsufficientFundsError extends PaymentError {
   constructor(amount, balance) {
-    // Your code here
+    super(
+      `Insufficient funds: need ${amount}, have ${balance}`,
+      "INSUFFICIENT_FUNDS",
+      amount,
+    );
+    this.name = "InsufficientFundsError";
+    this.balance = balance;
   }
 }
 
 export class NetworkError extends PaymentError {
   constructor(amount) {
-    // Your code here
+    super(`Network error during transaction`, "NETWORK_ERROR", amount);
+    this.name = "NetworkError";
+    this.retryable = true;
   }
 }
 
 export class FraudDetectedError extends PaymentError {
   constructor(amount) {
-    // Your code here
+    super("Suspicious transaction detected", "FRAUD_DETECTED", amount);
+    this.name = "FraudDetectedError";
+    this.retryable = false;
   }
 }
 
 export async function processPayment(amount, balance, networkStatus) {
-  // Your code here
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  if (amount < 0)
+    throw new PaymentError("Invalid amount", "INVALID_AMOUNT", amount);
+  if (amount > balance) throw new InsufficientFundsError(amount, balance);
+  if (networkStatus === "offline") throw new NetworkError(amount);
+  if (amount > 100000) throw new FraudDetectedError(amount);
+  return {
+    transactionId: "TXN" + Math.floor(Math.random() * 1000000),
+    amount,
+    status: "success",
+    timestamp: new Date().toISOString(),
+  };
 }
 
 export async function retryPayment(paymentFn, maxRetries, delayMs) {
-  // Your code here
+  if (maxRetries < 0 || delayMs <= 0)
+    throw new Error("Retries exhausted or delaytime not valid");
+  try {
+    return await paymentFn();
+  } catch (e) {
+    if (e.name === "NetworkError" && maxRetries > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return await retryPayment(paymentFn, maxRetries - 1, delayMs);
+    } else throw e;
+  }
 }
 
 export async function processWithFallback(primaryFn, fallbackFn) {
-  // Your code here
+  try {
+    return await primaryFn();
+  } catch (primaryError) {
+    try {
+      return await fallbackFn();
+    } catch (fallbackError) {
+      throw new PaymentError(
+        `Primary: ${primaryError.message}, Fallback: ${fallbackError.message}`,
+        "BOTH_FAILED",
+        0,
+      );
+    }
+  }
 }
 
 export function categorizeError(error) {
-  // Your code here
+  if (error instanceof InsufficientFundsError)
+    return {
+      type: "insufficient_funds",
+      retryable: false,
+      message: error.message,
+    };
+  if (error instanceof NetworkError)
+    return { type: "network", retryable: true, message: error.message };
+  if (error instanceof FraudDetectedError)
+    return { type: "fraud", retryable: false, message: error.message };
+  return {
+    type: "unknown",
+    retryable: false,
+    message: error.message || "Unknown error",
+  };
 }
+
+//setTimeout does not work inside an async function to "pause" execution. You need a Promise-based delay. If I simply write setTimeout inside an async function, then I use await to get the result(async function always returns promise, so we use await) the promise state changes to fumfilled but we dont't get data or result. why ?
+//This is beacuase when the function sees the setTimout it registers in the webApi and considers it has executed the code and changes its state to fulfilled. then the callback inside the setTimeout will be executed aftet the timer hits 0.
+// How to solve this ?
+// Either wrap the setTimout inside promise(not good)
+// or
+//do :   await new Promise((resolve) => setTimeout(resolve, 50)); --> keeps code clean and understandable.
+
+//It is good practice to prefer for loop over recursion as we add new stuff into callstack each time when using recursion.
+
+/* 
+export async function retryPayment(paymentFn, maxRetries, delayMs) {
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await paymentFn();
+    } catch (e) {
+      // If it's a network error and we haven't reached the limit yet
+      if (e.name === "NetworkError" && i < maxRetries) {
+        await new Promise(r => setTimeout(r, delayMs));
+        continue;
+      }
+      throw e; // Throw if it's a different error OR we're out of retries
+    }
+  }
+}
+*/

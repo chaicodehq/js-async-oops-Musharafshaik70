@@ -73,17 +73,56 @@
  *   // ]
  */
 export function orderChai(type, quantity) {
-  // Your code here
+  return new Promise((resolve, reject) => {
+    const prices = { cutting: 10, special: 20, ginger: 15, masala: 25 };
+    if (!prices[type]) return reject(new Error("Yeh chai available nahi hai!"));
+    if (typeof quantity !== "number" || quantity <= 0)
+      return reject(new Error("Kitni chai chahiye bhai?"));
+    const total = prices[type] * quantity;
+    setTimeout(() => {
+      resolve({ type, quantity, total });
+    }, 100);
+  });
 }
 
 export function checkIngredients(ingredient) {
-  // Your code here
+  return new Promise((resolve, reject) => {
+    const ingredients = ["tea", "milk", "sugar", "ginger", "cardamom"];
+    if (ingredients.includes(ingredient))
+      resolve({ ingredient, available: true });
+    else reject(new Error(`${ingredient} khatam ho gaya!`));
+  });
 }
 
 export function prepareChaiWithTimeout(type, timeoutMs) {
-  // Your code here
+  const timeOutPromise = new Promise((_, reject) => {
+    setTimeout(
+      () => reject(new Error("Bahut der ho gayi, chai nahi bani!")),
+      timeoutMs,
+    );
+  });
+  return Promise.race([orderChai(type, 1), timeOutPromise]);
 }
 
 export function processChaiQueue(orders) {
-  // Your code here
+  if (!orders || orders.length === 0) return Promise.resolve([]);
+  const orderPromises = orders.map((o) => {
+    return orderChai(o.type, o.quantity)
+      .then((result) => {
+        return { status: "fulfilled", value: result };
+      })
+      .catch((err) => {
+        return { status: "rejected", reason: err.message };
+      });
+  });
+  return Promise.all(orderPromises);
 }
+
+//why not to use promise.allsettled() in processChaiQueue ?
+//both promise.all() and Promise.allsettled() wait until all the promises are settled.
+// because allSettled() returns the whole error directly in the reason whereas the solution above returns the specific message I want as a Error.
+//remaining everything i.e map + Promise.all() is similar to Promise.allsettled();
+
+//why are you using Promise.all() , you could directly return the orderPromises ?
+// since I have given some time of 100ms uisng setTimeout to simulate the real chai process in orderChai function, I have to wait until all the promises are settled.
+//otherwise my result will look like [Promise <pending>, Promise <pending>, Promise <pending>]

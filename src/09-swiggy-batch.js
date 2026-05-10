@@ -88,25 +88,72 @@
  *   //     { status: "rejected", reason: "Item name required!" }]
  */
 export function prepareOrder(item, prepTime) {
-  // Your code here
+  return new Promise((res, rej) => {
+    setTimeout(() => {
+      if (!item || item.length === 0)
+        return rej(new Error("Item name required!"));
+      if (prepTime <= 0 || isNaN(prepTime))
+        return rej(new Error("Invalid prep time!"));
+      res({ item, ready: true, prepTime });
+    }, prepTime);
+  });
 }
 
 export function prepareBatch(items) {
-  // Your code here
+  if (items.length === 0) return Promise.resolve([]);
+  const allOrders = items.map((item) => prepareOrder(item.name, item.prepTime));
+  //allOrders returns an array of promises with the state pending.
+  return Promise.all(allOrders);
 }
 
 export function getFirstReady(items) {
-  // Your code here
+  if (items.length === 0)
+    return Promise.reject(new Error("No items to prepare!"));
+  //in the above line, i need to reject using promise instead of throw new Promise, as the Promise.race() below returns a promise object, it is expected that the fucntion should also return promise Object in base case or failure case.
+  const allOrders = items.map((item) => prepareOrder(item.name, item.prepTime));
+  return Promise.race(allOrders);
 }
 
-export function prepareSafeBatch(items) {
-  // Your code here
+export async function prepareSafeBatch(items) {
+  if (items.length === 0) return Promise.resolve([]);
+
+  const allOrders = items.map((item) => prepareOrder(item.name, item.prepTime));
+  const results = await Promise.allSettled(allOrders);
+
+  return results.map((res) => {
+    if (res.status === "rejected") {
+      return {
+        status: "rejected",
+        reason: res.reason.message,
+      };
+    }
+    return res;
+  });
+  // Convert Error object to string message as I need to return errorMessage for reason rather than error object.
+  //In general , allSettled returns entire error object.
+  //for this I made the function async or i would have used .then/.catch
 }
 
 export function deliverWithTimeout(orderPromise, timeoutMs) {
-  // Your code here
+  if (timeoutMs <= 0) return Promise.reject(new Error("Invalid timeout!"));
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error("Delivery timeout!"));
+    }, timeoutMs);
+  });
+  return Promise.race([orderPromise, timeout]);
 }
 
-export function batchWithRetry(items, maxRetries) {
-  // Your code here
+export async function batchWithRetry(items, maxRetries) {
+  //i made function async to implement this
+  if (maxRetries < 0 || isNaN(maxRetries))
+    throw new Error("No of retries exhausted or input invalid");
+  try {
+    return await prepareBatch(items);
+  } catch (e) {
+    if (maxRetries > 0) return await batchWithRetry(items, maxRetries - 1);
+    else throw e;
+  }
 }
+
+// error : unexpected reserved word --> it indicates you forgot to use async before function having await.

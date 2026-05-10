@@ -76,30 +76,90 @@
  */
 export class DabbaService {
   constructor(serviceName, area) {
-    // Your code here
+    this.serviceName = serviceName;
+    this.area = area;
+    this.customers = [];
+    this._nextId = 1;
+    //this._nextId++;
   }
 
   addCustomer(name, address, mealPreference) {
-    // Your code here
+    const meal = mealPreference.toLowerCase();
+    if (meal !== "veg" && meal !== "nonveg" && meal !== "jain") return null;
+    const isCustomer = this.customers.some(
+      (customer) => customer.name === name,
+    );
+    if (isCustomer) return null;
+    const customer = {
+      id: this._nextId++,
+      name,
+      address,
+      mealPreference,
+      active: true,
+      delivered: false,
+    };
+    this.customers.push(customer);
+    return customer;
   }
 
   removeCustomer(name) {
-    // Your code here
+    const isCustomer = this.customers.find(
+      (customer) => customer.name === name,
+    );
+    if (!isCustomer || isCustomer.active === false) {
+      return false;
+    }
+    isCustomer.active = false;
+    return true;
   }
 
   createDeliveryBatch() {
-    // Your code here
+    const activeCustomers = this.customers
+      .map((c) => ({ delivered: false, ...c }))
+      .filter((c) => c.active);
+    if (activeCustomers.length === 0) return [];
+    return activeCustomers.map((c) => ({
+      customerId: c.id,
+      name: c.name,
+      address: c.address,
+      mealPreference: c.mealPreference,
+      batchTime: new Date().toISOString(),
+    }));
   }
 
   markDelivered(customerId) {
-    // Your code here
+    const activeCustomerById = this.customers.find((c) => c.id === customerId);
+    if (activeCustomerById) {
+      activeCustomerById.delivered = true;
+      return true;
+    }
+    return false;
   }
 
   getDailyReport() {
-    // Your code here
+    const activeCustomers = this.customers.filter((c) => c.active);
+    const totalCustomers = activeCustomers.length;
+    const delivered = activeCustomers.filter((c) => c.delivered).length;
+    const pending = totalCustomers - delivered;
+    const mealBreakdown = activeCustomers.reduce(
+      (acc, c) => {
+        acc[c.mealPreference] = acc[c.mealPreference] + 1;
+        return acc;
+      },
+      { veg: 0, nonveg: 0, jain: 0 },
+    );
+    return { totalCustomers, delivered, pending, mealBreakdown };
   }
 
   getCustomer(name) {
-    // Your code here
+    const reqCustomer = this.customers.find(
+      (customer) => customer.name === name,
+    );
+    if (!reqCustomer) return null;
+    return reqCustomer;
   }
 }
+
+
+
+//cannot do autoincrement on numbers while initializing ex: a = 1++ ; its not allowed.
